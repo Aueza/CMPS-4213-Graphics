@@ -1,0 +1,71 @@
+<!DOCTYPE html> 
+<html>
+    
+    <body>
+        <canvas width="500" height="500" id="glCanvas"/>
+        <script>
+            var canvas = document.getElementById("glCanvas");
+            var gl = canvas.getContext("webgl2");
+
+            
+            var squareOfTriangles = [
+                -0.5,  0.5,  0.0, 
+                0.5,  0.5,  0.0, 
+                0.5, -0.5,  0.0, 
+
+                -0.5,  0.5,  0.0,
+                0.5, -0.5,  0.0,
+                -0.5, -0.5,  0.0 
+            ];
+
+            console.log(squareOfTriangles);
+
+            
+            var vertShaderSrcCode = 
+            `
+            attribute vec3 aPosition;
+            void main() {
+                gl_Position = vec4(aPosition, 1.0);
+            }
+            `;
+
+
+            
+           var fragShaderSrcCode = 
+            `void main() {
+                gl_FragColor = vec4(0.7, 0.6, 0.3, 1.0);
+            }
+            `;
+            
+            
+            vertShdr = gl.createShader( gl.VERTEX_SHADER );
+            gl.shaderSource( vertShdr, vertShaderSrcCode);
+            gl.compileShader( vertShdr );
+            console.log(gl.getShaderParameter(vertShdr, gl.COMPILE_STATUS));
+            console.log(gl.getShaderInfoLog( vertShdr ));
+
+
+            
+            fragShdr = gl.createShader( gl.FRAGMENT_SHADER );
+            gl.shaderSource( fragShdr, fragShaderSrcCode);
+            gl.compileShader( fragShdr );
+            console.log(gl.getShaderParameter(fragShdr, gl.COMPILE_STATUS));
+            console.log(gl.getShaderInfoLog( fragShdr ));
+
+            // TODO: link both shaders into a single program and use it 
+           var program = gl.createProgram();
+           gl.attachShader(program, vertShdr);
+           gl.attachShader(program, fragShdr);
+           gl.linkProgram(program);
+           gl.useProgram(program);
+            
+            // The hidden.js script will execute the rest of the code needed to render the scene
+            
+
+
+        </script>
+
+        <script src="hidden.js"></script>
+        
+    </body>
+</html>

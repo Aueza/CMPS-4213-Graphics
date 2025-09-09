@@ -1,0 +1,50 @@
+<!DOCTYPE html> 
+<html>
+    
+    <body>
+        <canvas width="500" height="500" id="glCanvas"/>
+        <script>
+            var canvas = document.getElementById("glCanvas");
+            var gl = canvas.getContext("webgl2");
+
+            
+            var squareOfTriangles = [
+                -0.5,  0.5,  0.0, 
+                0.5,  0.5,  0.0, 
+                0.5, -0.5,  0.0, 
+
+                -0.5,  0.5,  0.0,
+                0.5, -0.5,  0.0,
+                -0.5, -0.5,  0.0 
+            ];
+
+            console.log(squareOfTriangles);
+
+            
+            var vertShaderSrcCode = 
+            `
+            attribute vec3 aPosition;
+            void main() {
+                gl_Position = vec4(aPosition, 1.0);
+            }
+            `;
+
+
+            // TODO: We need to write a fragment shader to colorize the pixel, will make red for now
+            var fragShaderSrcCode = 
+            `
+            void main(){
+                gl_FragColor = vec4(0.5, 0.8, 0.3, 1.0); // RGBA
+            }
+            `;
+            
+            // The hidden.js script will execute the rest of the code needed to render the scene
+            
+
+
+        </script>
+
+        <script src="hidden.js"></script>
+        
+    </body>
+</html>
