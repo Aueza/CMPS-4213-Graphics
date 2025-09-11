@@ -20,17 +20,6 @@
 
             console.log(squareOfTriangles);
 
-            // TODO: We need to write a vertix shader to take our points and place in the webgl
-            // default "stage" or "viewing volume"
-            var vertShaderSrcCode = 
-            `
-            // Vec3 is a vector with 3 components (x, y, z)
-            attribute vec3 aPosition;
-            void main() {
-                gl_Position = vec4(aPosition, 1.0);
-            }
-            `;
-
 
             
             // The hidden.js script will execute the rest of the code needed to render the scene

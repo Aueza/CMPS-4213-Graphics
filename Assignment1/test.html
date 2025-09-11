@@ -16,6 +16,14 @@
             -0.5, 0.9, 0.0
          ];
 
+         // Randomly scaling the size of the triangle.
+         // Everytime the page is refreshed.
+         var sizeScale = Math.random() + 0.5;
+         var scaledVertices = [];
+         for (let i = 0; i < vertices.length; i += 3){
+            scaledVertices.push(vertices[i] * sizeScale, vertices[i+1] * sizeScale, vertices[i+2] * sizeScale);
+         }
+
          // Indices for two triangles
          var indices = [0, 1, 2, 3, 4, 5];
 
@@ -34,7 +42,7 @@
          // Vertex buffer
          var vertex_buffer = gl.createBuffer();
          gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(scaledVertices), gl.STATIC_DRAW);
 
          // Color buffer
          var color_buffer = gl.createBuffer();

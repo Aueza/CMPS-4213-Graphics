@@ -9,17 +9,24 @@
 // ];
 
 // console.log(squareOfTriangles);
-// var vertShaderSrcCode = 
-// `
-// attribute vec3 aPosition;
-// void main() {
-//     gl_Position = vec4(aPosition, 1.0);
-// }
-// `;
+ var vertShaderSrcCode = 
+ `
+ attribute vec3 aPosition;
+ attribute vec3 aColor;
+ varying vec3 vColor;
+
+ void main() {
+     // code to move the color to fragment shader.
+     vColor = aColor;
+     gl_Position = vec4(aPosition, 1.0);
+}
+`;
 
 
 var fragShaderSrcCode = 
-`void main() {
+`
+varying vec3 vColor;
+void main() {
     gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }
 `;
