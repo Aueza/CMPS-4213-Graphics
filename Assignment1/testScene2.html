@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+    <body>
+        <canvas width="570" height="570" id="my_Canvas"></canvas>
+        <script>
+            var canvas = document.getElementById('my_Canvas');
+            var gl = canvas.getContext('experimental-webgl');
+
+            // Helper to draw a rectangle (two triangles)
+            function drawRect(x, y, w, h, color) {
+                var vertices = [
+                    x, y, 0.0,
+                    x, y + h, 0.0,
+                    x + w, y + h, 0.0,
+                    x + w, y, 0.0
+                ];
+                
+                var indices = [0, 1, 2, 0, 2, 3];
+
+                // Vertex buffer
+                var vertex_buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+                // Index buffer
+                var index_buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+                // Vertex shader
+                var vertCode =
+                    'attribute vec3 coordinates;' +
+                    'void main(void){' +
+                    ' gl_Position = vec4(coordinates, 1.0);' +
+                    '}';
+
+                var vertShader = gl.createShader(gl.VERTEX_SHADER);
+                gl.shaderSource(vertShader, vertCode);
+                gl.compileShader(vertShader);
+
+                // Fragment shader
+                var fragCode =
+                    'void main(void) {' +
+                    ' gl_FragColor = vec4(' + color.join(',') + ');' +
+                    '}';
+
+                var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+                gl.shaderSource(fragShader, fragCode);
+                gl.compileShader(fragShader);
+
+                // Shader program
+                var shaderProgram = gl.createProgram();
+                gl.attachShader(shaderProgram, vertShader);
+                gl.attachShader(shaderProgram, fragShader);
+                gl.linkProgram(shaderProgram);
+                gl.useProgram(shaderProgram);
+
+                // Bind vertex buffer object
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+
+                // Bind index buffer object
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+
+                // Get the attribute location
+                var coord = gl.getAttribLocation(shaderProgram, "coordinates");
+
+                // Point an attribute to the currently bound VBO
+                gl.vertexAttribPointer(coord, 3, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(coord);
+
+                // Draw the rectangle
+                gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+            }
+
+            // Clear the canvas to sky blue
+            gl.clearColor(0.5, 0.8, 1.0, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            // Draw building background (grey rectangle)
+            drawRect(-0.8, -0.58, 1.61, 0.7, [0.2, 0.2, 0.2, 1.0]);
+
+            // Draw road (dark rectangle at bottom)
+            drawRect(-1.0, -1.0, 2.0, 0.45, [0.2, 0.2, 0.2, 1.0]);
+
+            // Draw road divider (yellow thin line)
+            drawRect(-1.0, -0.82, 2.0, 0.1, [1.0, 1.0, 0.0, 1.0])
+
+            // Now draw the bricks (same as your previous code)
+            var brickRows = 15;
+            var brickCols = 19;
+            var brickWidth = 0.08;
+            var brickHeight = 0.04;
+            var brickGap = 0.005;
+            var startX = -0.8;
+            var startY = -0.55;
+
+            var vertices = [];
+            var indices = [];
+            var brickColor = [0.7, 0.2, 0.1, 1.0]; // reddish brick
+
+            var vertCount = 0;
+            for (var row = 0; row < brickRows; row++) {
+                for (var col = 0; col < brickCols; col++) {
+                    var x = startX + col * (brickWidth + brickGap);
+                    var y = startY + row * (brickHeight + brickGap);
+
+                    var v0 = [x, y, 0.0];
+                    var v1 = [x, y + brickHeight, 0.0];
+                    var v2 = [x + brickWidth, y + brickHeight, 0.0];
+                    var v3 = [x + brickWidth, y, 0.0];
+
+                    vertices.push(...v0, ...v1, ...v2, ...v3);
+
+                    indices.push(
+                        vertCount, vertCount + 1, vertCount + 2,
+                        vertCount, vertCount + 2, vertCount + 3
+                    );
+                    vertCount += 4;
+                }
+            }
+
+            var vertex_buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+            var Index_Buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+            var vertCode =
+                'attribute vec3 coordinates;' +
+                'void main(void){' +
+                ' gl_Position = vec4(coordinates, 1.0);' +
+                '}';
+
+            var vertShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertShader, vertCode);
+            gl.compileShader(vertShader);
+
+            var fragCode =
+                'void main(void) {' +
+                ' gl_FragColor = vec4(' + brickColor + ');' +
+                '}';
+
+            var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragShader, fragCode);
+            gl.compileShader(fragShader);
+
+            var shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertShader);
+            gl.attachShader(shaderProgram, fragShader);
+            gl.linkProgram(shaderProgram);
+            gl.useProgram(shaderProgram);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
+
+            var coord = gl.getAttribLocation(shaderProgram, "coordinates");
+            gl.vertexAttribPointer(coord, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(coord);
+
+            gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+        </script>
+    </body>
+</html>
