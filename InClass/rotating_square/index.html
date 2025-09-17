@@ -1,0 +1,45 @@
+<!DOCTYPE html> 
+<html>
+    
+    <body>
+        <div>
+            <canvas width="500" height="500" id="glCanvas"/>
+        </div>
+
+        <div>
+            <button style="position: absolute; top: 600px; left: 100px; z-index: 10;" id="btnRotate">Rotate Me</button>
+        </div>
+        
+        
+        <script>
+            var canvas = document.getElementById("glCanvas");
+            var gl = canvas.getContext("webgl2");
+            var theta = 0;
+
+            function rotate() {
+                
+                
+                theta += 0.1;
+                console.log(theta);
+                console.log(thetaLoc);
+                gl.uniform1f(thetaLoc, theta);
+
+
+                gl.clear( gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+                gl.drawArrays( gl.TRIANGLES, 0, 6);
+            }
+
+            var btnRotate = document.getElementById("btnRotate");
+            btnRotate.addEventListener("click", rotate);
+
+            
+            
+
+            
+            
+        </script>
+
+        <script src="hidden.js"></script>
+        
+    </body>
+</html>
