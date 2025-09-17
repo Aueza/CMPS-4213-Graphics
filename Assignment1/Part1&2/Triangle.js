@@ -1,4 +1,42 @@
-// Helper function to build buffers.
+// Helper function to build buffers for float data type.
+function createBindDataBufferFloat(data){
+    var buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    return buffer;
+}
+
+// Helper function to build buffers for int data type.
+function createBindDataBufferInt(data){
+    var buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(data), gl.STATIC_DRAW);
+    return buffer;
+}
+
+// Helper function to create shaders.
+function createShader(type, shaderCode){
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, shaderCode);
+    gl.compileShader(shader);
+    return shader;
+}
+
+//Helper function to compile, link, and use shader programs.
+function createShaderProgram(vertShaderCode, fragShaderCode){
+    // Intitializing vertex and fragment shaders.
+    var vertShader = createShader(gl.VERTEX_SHADER, vertShaderCode);
+    var fragShader = createShader(gl.FRAGMENT_SHADER, fragShaderCode);
+
+    // Building shader program.
+    var shaderProgram = gl.createProgram();
+    gl.attachShader(shaderProgram, vertShader);
+    gl.attachShader(shaderProgram, fragShader);
+    gl.linkProgram(shaderProgram);
+    gl.useProgram(shaderProgram);
+
+    return shaderProgram;
+}
 
 // Vertex positions (6 vertices for 2 triangles)
 var vertices = [
@@ -34,19 +72,13 @@ var colors = [
     ];
 
 // Vertex buffer
-var vertex_buffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(scaledVertices), gl.STATIC_DRAW);
+var vertex_buffer = createBindDataBufferFloat(scaledVertices);
 
 // Color buffer
-var color_buffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+var color_buffer = createBindDataBufferFloat(colors);
 
 // Index buffer
-var Index_Buffer = gl.createBuffer();
-gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Index_Buffer);
-gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+var Index_Buffer = createBindDataBufferInt(indices);
 
 // Vertex shader
 var vertCode =
@@ -58,10 +90,6 @@ var vertCode =
     ' vColor = color;' +
     '}';
 
-var vertShader = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vertShader, vertCode);
-gl.compileShader(vertShader);
-
 // Fragment shader
 var fragCode =
     'precision mediump float;' +
@@ -70,16 +98,8 @@ var fragCode =
     ' gl_FragColor = vec4(vColor, 1.0);' +
     '}';
 
-var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fragShader, fragCode);
-gl.compileShader(fragShader);
-
 // Shader program
-var shaderProgram = gl.createProgram();
-gl.attachShader(shaderProgram, vertShader);
-gl.attachShader(shaderProgram, fragShader);
-gl.linkProgram(shaderProgram);
-gl.useProgram(shaderProgram);
+var shaderProgram = createShaderProgram(vertCode, fragCode);
 
 // Bind vertex buffer and set attribute
 gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
