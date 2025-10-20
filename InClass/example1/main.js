@@ -19,11 +19,9 @@ const vsSource = `
 // Fragment Shader Code
 const fsSource = `
     void main() {
-        gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); // Red color
+        gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue color
     }
 `;
-
-
 
 const program = createProgram(vsSource, fsSource);
 
@@ -46,7 +44,6 @@ const vertices = new Float32Array([
      0.01, -0.01, 0.0, 1.0,  // Bottom-right
 ]);
 
-
 // configure communication with GPU
 const vertexBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -57,44 +54,58 @@ const positionAttribLocation = gl.getAttribLocation(program, "a_position");
 gl.vertexAttribPointer(positionAttribLocation, 4, gl.FLOAT, false, 0, 0);
 gl.enableVertexAttribArray(positionAttribLocation);
 
-
 // Get uniform location for mat3 and send it to the shader
 const matrixUniformLocation = gl.getUniformLocation(program, "u_matrix");
 
-// our focus for today
+// Define raindrops.
+const raindrops = [];
+const numRaindrops = 200;
+for(let i = 0; i < numRaindrops; i++){
+    raindrops.push({
+        x: getDelta(-1,1),
+        y: getDelta(0.5, 1),
+        speed: getDelta(0.01, 0.03)
+    })
+}
+
 function render() {
     // Clear the canvas and draw the rotated square
     gl.clearColor(1.0, 1.0, 1.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    for(let i = 0; i < getDelta(5, 20); i++){
-        // Create a new 4x4 matrix from the translation vector.
+    // iterating through each raindrop.
+    for(let i = 0; i < raindrops.length; i++){
+        // select a raindrop.
+        let drop = raindrops[i];
+
+        // update the drop's y position.
+        drop.y -= drop.speed;
+        if(drop.y < -1){
+            // if the drop is off the screen.
+            // reset it to the top.
+            drop.y = 1;
+            drop.x = getDelta(-1, 1);
+        }
+
+        // create a model matrix for the drop.
         var model = mat4.create();
-        console.log(model);
+        // translate to the drop's position.
+        mat4.translate(model, model, [drop.x, drop.y, 0]);
 
-        translation_vector = [getDelta(-1, 1), getDelta(-1, 1), 0];
-        // drawing arrays before any transformations.
-        //gl.uniformMatrix4fv(matrixUniformLocation, false, model);
-        //gl.drawArrays(gl.TRIANGLE_STRIP, 0, 6); // Draw square (2 triangles)
-
-        mat4.translate(model, model, translation_vector);
-        console.log(model);
-
-        angle = getDelta(0, 360) * (Math.PI / 180);
+        // rotate the drop.
+        angle = getDelta(0, 180) * (Math.PI / 180);
         mat4.rotateZ(model, model, angle);
-        console.log(model);
 
-        scale_vector = [getDelta(3, 7), getDelta(3, 7), 0];
-        mat4.scale(model, model, scale_vector);
-        console.log(model);
+        //scale_vector = [getDelta(3, 7), getDelta(3, 7), 0];
+        //mat4.scale(model, model, scale_vector);
+        //console.log(model);
 
-        // update the transformation matrix
-        // Send the updated rotation matrix to the shader
+        // send the model matrix to the shader to be drawn.
         gl.uniformMatrix4fv(matrixUniformLocation, false, model);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 6); // Draw square (2 triangles)
     }
-
-
+    // request the next frame.
+    setTimeout(() => {render();}, 50);
 }
 
 document.getElementById("renderBtn").addEventListener("click", render);
