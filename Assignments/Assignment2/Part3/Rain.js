@@ -59,12 +59,13 @@ const matrixUniformLocation = gl.getUniformLocation(program, "u_matrix");
 
 // Define raindrops.
 const raindrops = [];
-const numRaindrops = 300;
+const numRaindrops = 500;
 for(let i = 0; i < numRaindrops; i++){
     raindrops.push({
         x: getDelta(-1,1),
-        y: getDelta(0.5, 1),
-        speed: getDelta(0.01, 0.03)
+        y: getDelta(0.8, 1),
+        speed: getDelta(0.01, 0.03),
+        wind: getDelta(-0.005, 0.005)
     })
 }
 
@@ -88,6 +89,7 @@ function render() {
         let drop = raindrops[i];
 
         // update the drop's y position.
+        drop.x += drop.wind;
         drop.y -= drop.speed;
         if(drop.y < -1){
             // if the drop is off the screen.
@@ -102,8 +104,8 @@ function render() {
         mat4.translate(model, model, [drop.x, drop.y, 0]);
 
         // rotate the drop.
-        //angle = getDelta(0, 180) * (Math.PI / 180);
-        //mat4.rotateZ(model, model, angle);
+        angle = getDelta(0, 180) * (Math.PI / 180);
+        mat4.rotateZ(model, model, angle);
 
         //scale_vector = [getDelta(3, 7), getDelta(3, 7), 0];
         //mat4.scale(model, model, scale_vector);
