@@ -16,10 +16,10 @@
 
         <canvas id="glCanvas" width="512" height="512"></canvas>
         <div id="controls" style="margin-top:10px;">
-            <button id="rot-left">⟲ Left</button>
-            <button id="rot-right">Right ⟳</button>
-            <button id="rot-up">Up ↑</button>
-            <button id="rot-down">Down ↓</button>
+            <button id="rot-left">Left</button>
+            <button id="rot-right">Right</button>
+            <button id="rot-up">Up</button>
+            <button id="rot-down">Down</button>
             <button id="reset">Reset</button>
             <label for="shape-select" style="margin-left:12px;">Shape:</label>
             <select id="shape-select">
@@ -30,8 +30,14 @@
                 <option value="icosa">Icosahedron</option>
                 <option value="sphere">Sphere</option>
             </select>
-            <button id="render-scene" style="margin-left:12px;">Render Scene</button>
-            <button id="render-planets" style="margin-left:6px;">Render Planet Scene</button>
+            <button id="startBtn" style="margin-left:12px;">Start Rendering</button>
+            <script>
+                document.getElementById('startBtn').addEventListener('click', function(){
+                window.startBasicScene?.();
+                this.disabled = true;
+                this.textContent = 'Rendering...';
+                });
+            </script>
         </div>
     </body>
 </html>

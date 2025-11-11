@@ -215,11 +215,12 @@ window.onload = function main(){
 
         // Topology list
         let icosaFaces = [
-            [ 0,  1, 10], [ 0, 10,  5], [ 0,  5,  4], [ 0,  4,  8], [ 0,  8,  1],
-            [ 3,  2, 11], [ 3, 11,  7], [ 3,  7,  6], [ 3,  6,  9], [ 3,  9,  2],
-            [ 1,  8,  6], [ 1,  6,  7], [ 1,  7, 10],
-            [ 2,  9,  4], [ 2,  4,  5], [ 2,  5, 11],
-            [ 8,  4,  9], [ 9,  6,  8],
+            [ 0,  1, 10], [ 0, 10,  5], [ 0,  5,  4], 
+            [ 0,  4,  8], [ 0,  8,  1], [ 3,  2, 11], 
+            [ 3, 11,  7], [ 3,  7,  6], [ 3,  6,  9], 
+            [ 3,  9,  2], [ 1,  8,  6], [ 1,  6,  7], 
+            [ 1,  7, 10], [ 2,  9,  4], [ 2,  4,  5], 
+            [ 2,  5, 11], [ 8,  4,  9], [ 9,  6,  8],
             [ 5, 10, 11], [ 11,  7, 10]
         ];
 
@@ -565,33 +566,8 @@ window.onload = function main(){
         });
     }
 
-    // wire render-scene button (calls Scene.js starter)
-    const renderBtn = q('render-scene');
-    if(renderBtn){
-        renderBtn.addEventListener('click', () => {
-            // stop the main single-shape loop so the scene can take over the canvas
-            if(typeof window.stopMainScene === 'function') window.stopMainScene();
-            if(typeof window.start3DScene === 'function'){
-                window.start3DScene();
-            } else {
-                console.warn('Scene starter not available yet.');
-            }
-        });
-    }
 
-    // wire planet-scene button
-    const planetBtn = q('render-planets');
-    if(planetBtn){
-        planetBtn.addEventListener('click', () => {
-            if(typeof window.stopMainScene === 'function') window.stopMainScene();
-            if(typeof window.startPlanetScene === 'function'){
-                window.startPlanetScene();
-            } else {
-                console.warn('Planet scene starter not available yet.');
-            }
-        });
-    }
-
+    
     // build initial scene
     buildSceneForShape(currentShapeName);
 
