@@ -1,330 +1,291 @@
-// Simple 3D scene using blueprints from main.js
-// Expects a canvas with id 'glCanvas' and the blueprint functions to be
-// available on window.blueprints (main.js exposes them when loaded).
+// Solar system with basic Lambertian lighting and a starfield.
 
-// Vertex shader (pos + color)
+// Vertex shader for planets.
 const sceneVert = `
 attribute vec3 aPosition;
-attribute vec3 aColor;
-varying vec3 vColor;
+attribute vec3 aNormal;
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
-void main(){
-  vColor = aColor;
-  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+varying vec3 vNormal;
+varying vec3 vPosition;
+void main() {
+    vec4 worldPos = uModel * vec4(aPosition, 1.0);
+    vPosition = worldPos.xyz;
+    vNormal = mat3(uModel) * aNormal;
+    gl_Position = uProjection * uView * worldPos;
 }`;
 
+// Vertex shader for stars
+const starVert = `
+attribute vec3 aPosition;
+uniform mat4 uView;
+uniform mat4 uProjection;
+void main() {
+    gl_PointSize = 2.0;
+    gl_Position = uProjection * uView * vec4(aPosition, 1.0);
+}`;
+
+// Fragment shader for planets (Lambertian shading) using sun as light source.
 const sceneFrag = `
 precision mediump float;
-varying vec3 vColor;
-void main(){
-  gl_FragColor = vec4(vColor, 1.0);
+varying vec3 vNormal;
+varying vec3 vPosition;
+uniform vec3 uLightPos;
+uniform vec3 uBaseColor;
+void main() {
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(vPosition - uLightPos);
+    float diff = max(dot(N, L), 0.0);
+    vec3 color = uBaseColor * (0.18 + 0.82 * diff); // 0.18 ambient, 0.82 diffuse
+    gl_FragColor = vec4(color, 1.0);
 }`;
 
-// Utility: create shader and program
-function createShader(gl, type, src){
+// Fragment shader for stars
+const starFrag = `
+precision mediump float;
+void main(){
+    gl_FragColor = vec4(1.0);
+}`;
+
+// Utility: compile shader/program
+function compileShader(gl, src, type) {
+    // Compile shader
     const s = gl.createShader(type);
     gl.shaderSource(s, src);
     gl.compileShader(s);
-    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
-        console.error('Shader compile error:', gl.getShaderInfoLog(s));
-    }
+    
     return s;
 }
-
-function createProgram(gl, vsSrc, fsSrc){
-    const vs = createShader(gl, gl.VERTEX_SHADER, vsSrc);
-    const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+function createProgram(gl, vsSrc, fsSrc) {
+    // Compile shaders
+    const vs = compileShader(gl, vsSrc, gl.VERTEX_SHADER);
+    const fs = compileShader(gl, fsSrc, gl.FRAGMENT_SHADER);
     const p = gl.createProgram();
+    // Attach and link
     gl.attachShader(p, vs);
     gl.attachShader(p, fs);
     gl.linkProgram(p);
-    if(!gl.getProgramParameter(p, gl.LINK_STATUS)){
-        console.error('Program link error:', gl.getProgramInfoLog(p));
-    }
     return p;
 }
 
-// HSV -> RGB helper
-function hsvToRgb(h, s, v){
-    let r=0,g=0,b=0;
-    const i = Math.floor(h*6);
-    const f = h*6 - i;
-    const p = v * (1 - s);
-    const q = v * (1 - f*s);
-    const t = v * (1 - (1 - f) * s);
-    switch(i % 6){
-        case 0: r=v; g=t; b=p; break;
-        case 1: r=q; g=v; b=p; break;
-        case 2: r=p; g=v; b=t; break;
-        case 3: r=p; g=q; b=v; break;
-        case 4: r=t; g=p; b=v; break;
-        case 5: r=v; g=p; b=q; break;
+// Compute per-vertex normals (average of adjacent face normals)
+function computeVertexNormals(vertices, faces) {
+    // Initialize normals array with zeros
+    const nVerts = vertices.length;
+    const normals = new Array(nVerts).fill(0).map(() => [0, 0, 0]);
+    for (const f of faces) {
+        // Calculate face normal
+        const a = vertices[f[0]];
+        const b = vertices[f[1]];
+        const c = vertices[f[2]];
+        // Cross product
+        const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+        const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+        // Normal
+        const nx = uy * vz - uz * vy;
+        const ny = uz * vx - ux * vz;
+        const nz = ux * vy - uy * vx;
+        // Add to each vertex normal
+        for (const idx of f) {
+            normals[idx][0] += nx;
+            normals[idx][1] += ny;
+            normals[idx][2] += nz;
+        }
     }
-    return [r,g,b];
+    // Normalize
+    return normals.map(n => {
+        const l = Math.hypot(n[0], n[1], n[2]) || 1.0;
+        return [n[0] / l, n[1] / l, n[2] / l];
+    });
 }
 
-// Build buffers from blueprint (geometry/topology). This does its own
-// adjacency-based greedy coloring (so neighboring faces differ).
-function buildBuffersFromBlueprint(gl, blueprint){
+// Build buffers for a solid-colored, smooth-shaded sphere
+function buildSphereBuffers(gl, blueprint, color) {
     const verts = blueprint.geometry;
     const faces = blueprint.topology;
+    const normals = computeVertexNormals(verts, faces);
 
-    // build edge map
-    const edgeMap = new Map();
-    faces.forEach((face, fi) =>{
-        for(let e=0;e<3;e++){
-            const a = Math.min(face[e], face[(e+1)%3]);
-            const b = Math.max(face[e], face[(e+1)%3]);
-            const key = `${a}-${b}`;
-            if(!edgeMap.has(key)) edgeMap.set(key, []);
-            edgeMap.get(key).push(fi);
-        }
-    });
-
-    const nFaces = faces.length;
-    const adj = new Array(nFaces).fill(0).map(()=> new Set());
-    for(const arr of edgeMap.values()){
-        if(arr.length > 1){
-            for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
-                adj[arr[i]].add(arr[j]); adj[arr[j]].add(arr[i]);
-            }
-        }
-    }
-
-    // greedy coloring
-    const faceColorIdx = new Array(nFaces).fill(-1);
-    for(let fi=0; fi<nFaces; fi++){
-        const used = {};
-        adj[fi].forEach(nb => { const idx = faceColorIdx[nb]; if(idx !== -1) used[idx]=true; });
-        let c=0; while(used[c]) c++; faceColorIdx[fi]=c;
-    }
-    const nColorsUsed = Math.max(...faceColorIdx) + 1;
-
-    const positionArray = [];
-    const colorArray = [];
-    faces.forEach((face, fi) =>{
-        const color = hsvToRgb(faceColorIdx[fi] / Math.max(1,nColorsUsed), 0.65, 0.95);
-        face.forEach(vi => {
+    // Expand to flat arrays
+    const posArr = [];
+    const normArr = [];
+    // For each face, add its vertices and normals
+    for (const face of faces) {
+        for (const vi of face) {
             const v = verts[vi];
-            positionArray.push(v[0], v[1], v[2]);
-            colorArray.push(color[0], color[1], color[2]);
-        });
-    });
+            const n = normals[vi];
+            posArr.push(v[0], v[1], v[2]);
+            normArr.push(n[0], n[1], n[2]);
+        }
+    }
 
     const posBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positionArray), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(posArr), gl.STATIC_DRAW);
 
-    const colBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorArray), gl.STATIC_DRAW);
+    const normBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normArr), gl.STATIC_DRAW);
 
-    return { vertexBuffer: posBuf, colorBuffer: colBuf, vertexCount: positionArray.length/3 };
+    return { posBuf, normBuf, vertexCount: posArr.length / 3, color };
 }
 
-function start3DScene(){
+// Building star positions.
+function buildStarBuffer(gl, numStars = 200, radius = 80){
+    const positions = [];
+    for(let i = 0; i < numStars; ++i){
+        // Random points on sphere
+        const theta = Math.random() * 2 * Math.PI;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = radius;
+        const x = r * Math.sin(phi) * Math.cos(theta);
+        const y = r * Math.sin(phi) * Math.sin(theta);
+        const z = r * Math.cos(phi);
+        positions.push(x, y, z);
+    }
+    // Create and bind star buffer
+    const starBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, starBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    return {starBuf, count: numStars};
+}
+
+// Start the solar system scene
+function startPlanetScene() {
     const canvas = document.getElementById('glCanvas');
-    if(!canvas){ console.error('No canvas with id glCanvas found'); return; }
+    if (!canvas) { console.error('No canvas with id glCanvas found'); return; }
     const gl = canvas.getContext('webgl');
-    if(!gl){ console.error('WebGL not supported'); return; }
+    if (!gl) { console.error('WebGL not supported'); return; }
 
-    gl.viewport(0,0,canvas.width, canvas.height);
-    gl.clearColor(0.9, 0.9, 0.95, 1.0);
-
-    const program = createProgram(gl, sceneVert, sceneFrag);
-    gl.useProgram(program);
-
-    const aPos = gl.getAttribLocation(program, 'aPosition');
-    const aCol = gl.getAttribLocation(program, 'aColor');
-    const uModel = gl.getUniformLocation(program, 'uModel');
-    const uView = gl.getUniformLocation(program, 'uView');
-    const uProj = gl.getUniformLocation(program, 'uProjection');
-
-    // camera
-    const viewMatrix = mat4.create();
-    const projMatrix = mat4.create();
-    mat4.lookAt(viewMatrix, [0,2,8], [0,0,0], [0,1,0]);
-    mat4.perspective(projMatrix, 45 * Math.PI/180, canvas.width / canvas.height, 0.1, 100);
-
-    // prepare scene objects from available blueprints
-    const bp = window.blueprints || {};
-    const names = ['cube','tetra','icosa','dodeca','sphere'];
-    const objects = [];
-    let x = -4.0;
-    for(const name of names){
-        if(typeof bp[name] !== 'function') { x += 2.0; continue; }
-        const blueprint = (name === 'sphere') ? bp[name](2) : bp[name]();
-        const bufs = buildBuffersFromBlueprint(gl, blueprint);
-
-        // model matrix: position them along x axis
-        const model = mat4.create();
-        mat4.translate(model, model, [x, 0.0, 0.0]);
-        mat4.scale(model, model, [0.9,0.9,0.9]);
-
-        objects.push({ name, blueprint, bufs, model });
-        x += 2.0;
-    }
-
-    let angle = 0;
-    function render(){
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.enable(gl.DEPTH_TEST);
-
-        // ensure program is active before setting uniforms
-        gl.useProgram(program);
-
-        // rotate whole scene slowly
-        angle += 0.005;
-        const view = mat4.clone(viewMatrix);
-        mat4.rotateY(view, view, angle*0.2);
-
-        gl.uniformMatrix4fv(uView, false, view);
-        gl.uniformMatrix4fv(uProj, false, projMatrix);
-
-        for(const obj of objects){
-            // rotate each object as well
-            const m = mat4.clone(obj.model);
-            mat4.rotateY(m, m, angle);
-            mat4.rotateX(m, m, angle*0.3);
-            gl.uniformMatrix4fv(uModel, false, m);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, obj.bufs.vertexBuffer);
-            gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aPos);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, obj.bufs.colorBuffer);
-            gl.vertexAttribPointer(aCol, 3, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aCol);
-
-            gl.drawArrays(gl.TRIANGLES, 0, obj.bufs.vertexCount);
-        }
-
-        requestAnimationFrame(render);
-    }
-
-    requestAnimationFrame(render);
-}
-
-// expose starter and do NOT auto-start; caller (UI button) should invoke
-window.start3DScene = start3DScene;
-
-// Build buffers for a solid-colored triangulated blueprint (uniform color)
-function buildSolidColorFromBlueprint(gl, blueprint, color){
-    const verts = blueprint.geometry;
-    const faces = blueprint.topology;
-    const positionArray = [];
-    const colorArray = [];
-    for(const face of faces){
-        for(const vi of face){
-            const v = verts[vi];
-            positionArray.push(v[0], v[1], v[2]);
-            colorArray.push(color[0], color[1], color[2]);
-        }
-    }
-    const posBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positionArray), gl.STATIC_DRAW);
-    const colBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorArray), gl.STATIC_DRAW);
-    return { vertexBuffer: posBuf, colorBuffer: colBuf, vertexCount: positionArray.length/3 };
-}
-
-// Start a simple solar system / planet scene
-function startPlanetScene(){
-    const canvas = document.getElementById('glCanvas');
-    if(!canvas){ console.error('No canvas with id glCanvas found'); return; }
-    const gl = canvas.getContext('webgl');
-    if(!gl){ console.error('WebGL not supported'); return; }
-
-    gl.viewport(0,0,canvas.width, canvas.height);
-    // dark background for space
+    // Set viewport and clear color
+    gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0.02, 0.02, 0.05, 1.0);
 
-    const program = createProgram(gl, sceneVert, sceneFrag);
-    gl.useProgram(program);
+    // Create shader program for planet and stars
+    const planetProgram = createProgram(gl, sceneVert, sceneFrag);
+    const starProgram = createProgram(gl, starVert, starFrag);
 
-    const aPos = gl.getAttribLocation(program, 'aPosition');
-    const aCol = gl.getAttribLocation(program, 'aColor');
-    const uModel = gl.getUniformLocation(program, 'uModel');
-    const uView = gl.getUniformLocation(program, 'uView');
-    const uProj = gl.getUniformLocation(program, 'uProjection');
+    // Planet uniform/ attribute locations
+    const aPos = gl.getAttribLocation(planetProgram, 'aPosition');
+    const aNorm = gl.getAttribLocation(planetProgram, 'aNormal');
+    const uModel = gl.getUniformLocation(planetProgram, 'uModel');
+    const uView = gl.getUniformLocation(planetProgram, 'uView');
+    const uProj = gl.getUniformLocation(planetProgram, 'uProjection');
+    const uLightPos = gl.getUniformLocation(planetProgram, 'uLightPos');
+    const uBaseColor = gl.getUniformLocation(planetProgram, 'uBaseColor');
 
+    // Star uniform/ attribute locations
+    const sPos = gl.getAttribLocation(starProgram, 'aPosition');
+    const sView = gl.getUniformLocation(starProgram, 'uView');
+    const sProj = gl.getUniformLocation(starProgram, 'uProjection');
+
+    // Camera setup
+    let camYam = 0; // left-right
+    let camPitch = 0; // up-down
+    let camDist = 30; // distance from origin
+
+    // keyboard controls for camera
+    window.addEventListener('keydown', function(e) {
+        const step = 0.05;
+        if (e.key === 'ArrowLeft') camYam -= step;
+        if (e.key === 'ArrowRight') camYam += step;
+        if (e.key === 'ArrowUp') camPitch = Math.min(Math.PI/2, camPitch + step);
+        if (e.key === 'ArrowDown') camPitch = Math.max(-Math.PI/2, camPitch - step);
+        if (e.key === '+' || e.key === '=') camDist = Math.max(5, camDist - 1);
+        if (e.key === '-' || e.key === '_') camDist = Math.min(100, camDist + 1);
+    });
+
+    // Compute view and projection matrices for camera
     const viewMatrix = mat4.create();
     const projMatrix = mat4.create();
-    mat4.lookAt(viewMatrix, [0,6,30], [0,0,0], [0,1,0]);
-    mat4.perspective(projMatrix, 45 * Math.PI/180, canvas.width / canvas.height, 0.1, 200);
+    mat4.lookAt(viewMatrix, [0, 6, 30], [0, 0, 0], [0, 1, 0]);
+    mat4.perspective(projMatrix, 45 * Math.PI / 180, canvas.width / canvas.height, 0.1, 200);
 
-    const bp = window.blueprints || {};
-    if(typeof bp['sphere'] !== 'function'){
-        console.error('sphere blueprint not available');
-        return;
-    }
-
-    // Planet definitions: [name, distance, radius, colorRGB]
+    // Planets: [name, distance, radius, color]
     const planets = [
-        ['Sun', 0.0, 4.0, [1.0, 0.9, 0.2]],
-        ['Mercury', 6.0, 0.4, [0.6,0.6,0.6]],
-        ['Venus', 9.0, 0.95, [0.9,0.7,0.3]],
-        ['Earth', 13.0, 1.0, [0.2,0.5,0.9]],
-        ['Mars', 16.5, 0.53, [0.9,0.3,0.2]],
-        ['Jupiter', 21.5, 2.2, [0.9,0.6,0.3]],
-        ['Saturn', 27.0, 1.8, [0.95,0.85,0.6]],
-        ['Uranus', 32.0, 1.0, [0.6,0.9,0.95]],
-        ['Neptune', 36.0, 1.0, [0.25,0.45,0.9]]
+        ['Sun', 0.0, 4.0, [6.5, 5.2, 2.0]],
+        ['Mercury', 6.0, 0.4, [0.6, 0.6, 0.6]],
+        ['Venus', 9.0, 0.95, [0.9, 0.7, 0.3]],
+        ['Earth', 13.0, 1.0, [0.2, 0.5, 0.9]],
+        ['Mars', 16.5, 0.53, [0.9, 0.3, 0.2]],
+        ['Jupiter', 21.5, 2.2, [0.9, 0.6, 0.3]],
+        ['Saturn', 27.0, 1.8, [0.95, 0.85, 0.6]],
+        ['Uranus', 32.0, 1.0, [0.6, 0.9, 0.95]],
+        ['Neptune', 36.0, 1.0, [0.25, 0.45, 0.9]]
     ];
 
-    const objects = [];
-    for(const p of planets){
-        const name = p[0];
-        const distance = p[1];
-        const radius = p[2];
-        const color = p[3];
-        // higher subdivision for smoother spheres
-        const blueprint = bp['sphere'](3);
-        const bufs = buildSolidColorFromBlueprint(gl, blueprint, color);
+    // Use higher subdivision for smoother spheres
+    const bp = window.blueprints && window.blueprints.uvSphere ? window.blueprints.uvSphere(48, 36) : null;
+    if (!bp) { console.error('Sphere blueprint not available'); return; }
 
-        const model = mat4.create();
-        // initially place along +X axis
-        mat4.translate(model, model, [distance, 0, 0]);
-        mat4.scale(model, model, [radius, radius, radius]);
-        objects.push({ name, distance, radius, bufs, model });
+    // Build planet objects
+    const objects = [];
+    for (const p of planets) {
+        const name = p[0], distance = p[1], radius = p[2], color = p[3];
+        const bufs = buildSphereBuffers(gl, bp, color);
+        objects.push({ name, distance, radius, bufs });
     }
 
+    // Build star buffer
+    const stars = buildStarBuffer(gl, 500, 80);
+
     let t = 0;
-    function render(){
+    function render() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.DEPTH_TEST);
+        
+        // Calculate camera position from yam, pitch, and dist
+        const camX = camDist * Math.cos(camPitch) * Math.sin(camYam);
+        const camY = camDist * Math.sin(camPitch);
+        const camZ = camDist * Math.cos(camPitch) * Math.cos(camYam);
 
-        // ensure program is active before setting uniforms
-        gl.useProgram(program);
+        mat4.lookAt(viewMatrix, [camX, camY, camZ], [0, 0, 0], [0, 1, 0]);
 
-        t += 0.01;
+        // Draw stars
+        gl.useProgram(starProgram);
+        gl.uniformMatrix4fv(sView, false, viewMatrix);
+        gl.uniformMatrix4fv(sProj, false, projMatrix);
+        gl.bindBuffer(gl.ARRAY_BUFFER, stars.starBuf);
+        gl.enableVertexAttribArray(sPos);
+        gl.vertexAttribPointer(sPos, 3, gl.FLOAT, false, 0, 0);
+        gl.disable(gl.DEPTH_TEST); // drawing behind everything.
+        gl.drawArrays(gl.POINTS, 0, stars.count);
+        gl.enable(gl.DEPTH_TEST);
+
+        // Draw planets
+        gl.useProgram(planetProgram);
         gl.uniformMatrix4fv(uView, false, viewMatrix);
         gl.uniformMatrix4fv(uProj, false, projMatrix);
+        gl.uniform3fv(uLightPos, [0,0,0]); // Sun at origin
 
-        // draw orbits (approx as thin rings by drawing small points is expensive; skip for now)
+        t += 0.01;
 
-        for(const obj of objects){
-            const angle = t * (0.2 + 0.05 * (1.0/Math.max(0.1, obj.radius)) );
-            // compute orbital transform
+        for (const obj of objects) {
+            // Animate planets (except sun)
+            let angle = 0;
+            if (obj.distance > 0.0) {
+                angle = t * (0.2 + 0.05 * (1.0 / Math.max(0.1, obj.radius)));
+            }
+            // Model matrix
             const m = mat4.create();
             const x = obj.distance * Math.cos(angle);
             const z = obj.distance * Math.sin(angle);
+            
             mat4.translate(m, m, [x, 0, z]);
             mat4.scale(m, m, [obj.radius, obj.radius, obj.radius]);
-
+        
             gl.uniformMatrix4fv(uModel, false, m);
+            gl.uniform3fv(uBaseColor, obj.bufs.color);
 
-            gl.bindBuffer(gl.ARRAY_BUFFER, obj.bufs.vertexBuffer);
+            // Bind buffers and draw
+            gl.bindBuffer(gl.ARRAY_BUFFER, obj.bufs.posBuf);
             gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aPos);
 
-            gl.bindBuffer(gl.ARRAY_BUFFER, obj.bufs.colorBuffer);
-            gl.vertexAttribPointer(aCol, 3, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aCol);
+            // Normals
+            gl.bindBuffer(gl.ARRAY_BUFFER, obj.bufs.normBuf);
+            gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aNorm);
 
             gl.drawArrays(gl.TRIANGLES, 0, obj.bufs.vertexCount);
         }
@@ -334,6 +295,5 @@ function startPlanetScene(){
 
     requestAnimationFrame(render);
 }
-
-// expose planet starter
+// Expose planet starter
 window.startPlanetScene = startPlanetScene;
