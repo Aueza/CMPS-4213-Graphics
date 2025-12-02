@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Assignment 4</title>
+        <style> body { font-family: sans-serif; } canvas { border: 1px solid #666; } </style>
+    
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+
+        <script src="material.js" defer></script>
+        <script src="lib.js" defer></script>
+        <script src="scene.js" defer></script>
+        <script src="main.js" defer></script>
+    </head>
+
+    <body>
+        <h1>Assignment 4</h1>
+
+        <canvas id="glCanvas" width="512" height="512"></canvas>
+        <div id="controls" style="margin-top:10px;">
+            <button id="rot-left">Left</button>
+            <button id="rot-right">Right</button>
+            <button id="rot-up">Up</button>
+            <button id="rot-down">Down</button>
+            <button id="reset">Reset</button>
+            <label for="shape-select" style="margin-left:12px;">Shape:</label>
+            <select id="shape-select">
+                <option value="cube">Cube</option>
+                <option value="tetra">Tetrahedron</option>
+                <option value="octa">Octahedron</option>
+                <option value="dodeca">Dodecahedron</option>
+                <option value="icosa">Icosahedron</option>
+                <option value="sphere">Sphere</option>
+            </select>
+            <button id="render-scene" style="margin-left:12px;">Render Scene</button>
+            <label for="material-select" style="margin-left:12px;">Material:</label>
+            <select id="material-select"></select>
+    </body>
+</html>
